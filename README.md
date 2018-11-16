@@ -20,7 +20,8 @@ Supported platforms:
 - .NET Core (Linux, MacOS, Windows)
 
 Not yet supported: 
-- Xamarin iOS, Xamarin Android
+- Xamarin iOS
+- Xamarin Android
 
 Dependencies:
 - NBitcoin
@@ -32,12 +33,11 @@ Dependencies:
 - xUnit, Moq
 
 
-
 ## Usage
 
 ### Configuration
 
-```
+```C#
 ECKeyPair localLightningKey = new ECKeyPair("<node private key>", true);
 ECKeyPair walletKey = new ECKeyPair("<wallet private key>", true);
 
@@ -77,7 +77,7 @@ Configuration Entities: `BitcoindClientConfiguration`, `BlockchainConfiguration`
 
 ### Connect to a node
 
-```
+```C#
 IPeerService peerService = node.Services.GetService<IPeerService>();
 NodeAddress nodeAddress = NodeAddress.Parse("<publickey@ip:port>");
 IPeer peer = peerService.AddPeer(nodeAddress, persist: true, reconnect: true);
@@ -85,7 +85,7 @@ IPeer peer = peerService.AddPeer(nodeAddress, persist: true, reconnect: true);
 
 ### Open a channel
 
-```
+```C#
 var channelEstablishmentService = node.Services.GetService<IChannelEstablishmentService>();
 channelEstablishmentService.SuccessProvider.Subscribe(peerAndChannel =>
 {
@@ -98,12 +98,12 @@ channelEstablishmentService.OpenChannel(peer, 25000);
 
 ### Get all active channels and updates
 
-```
+```C#
 IChannelService channelService = node.Services.GetService<IChannelService>();
 var activeChannels = channelService.Channels.Where(c => c.Active);
 ```
 
-```
+```C#
 var channelStateService = node.Services.GetService<IChannelStateService>();
 channelStateService.ChannelActiveStateChangedProvider
     .Where(c => c.Active)
@@ -115,7 +115,7 @@ channelStateService.ChannelActiveStateChangedProvider
 
 ### Close a channel
 
-```
+```C#
 IChannelCloseService closeService = node.Services.GetService<IChannelCloseService>();
 
 // mutual close, if peer is not available do a unilateral close:
@@ -127,7 +127,7 @@ closeService.UnilateralClose(channel);
 
 ### Get all channels and nodes in the network
 
-```
+```C#
 var networkViewService = node.Services.GetService<INetworkViewService>();
 var networkChannels = networkViewService.View.GetChannels();
 var networkNodes = networkViewService.View.GetNodes();
