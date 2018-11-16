@@ -1,0 +1,12 @@
+{
+  "NetworkViewConfiguration" : {
+    "ChannelTimeout": "14.00:00:00",
+    "NodeTimeout": "14.00:00:00"
+  },
+  "BitcoindClientConfiguration" : {
+    "RpcIpAddress": "127.0.0.1",
+    "RpcPort": 18332,
+    "RpcUser": "lnuser",
+    "RpcPassword": "lnpass"
+  }
+}

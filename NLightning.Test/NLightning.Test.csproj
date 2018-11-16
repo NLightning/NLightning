@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netcoreapp2.1</TargetFramework>
+
+        <IsPackable>false</IsPackable>
+
+        <AssemblyName>NLightning.Test</AssemblyName>
+
+        <RootNamespace>NLightning.Test</RootNamespace>
+
+        <OutputType>Library</OutputType>
+
+        <LangVersion>7.3</LangVersion>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.8.0" />
+        <PackageReference Include="Moq" Version="4.10.0" />
+        <PackageReference Include="xunit" Version="2.3.1" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\NLightning\NLightning.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Compile Remove="Protocol\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Remove="Protocol\**" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Protocol\**" />
+    </ItemGroup>
+
+</Project>

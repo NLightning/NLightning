@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLightning", "NLightning\NLightning.csproj", "{20DBFB4B-B47D-4ACA-829C-F55F2FE6A405}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLightning.Test", "NLightning.Test\NLightning.Test.csproj", "{B4266D5E-0080-45F9-B391-A9AF652E4BAE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLightning.Console", "NLightning.Console\NLightning.Console.csproj", "{E70997F0-49EC-4BA4-9869-8DDC6D498884}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NLightning.Bitcoind", "NLightning.Bitcoind\NLightning.Bitcoind.csproj", "{378F1BEA-FB9A-4ACA-B6BF-C8244CA39769}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{20DBFB4B-B47D-4ACA-829C-F55F2FE6A405}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{20DBFB4B-B47D-4ACA-829C-F55F2FE6A405}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{20DBFB4B-B47D-4ACA-829C-F55F2FE6A405}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{20DBFB4B-B47D-4ACA-829C-F55F2FE6A405}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B4266D5E-0080-45F9-B391-A9AF652E4BAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B4266D5E-0080-45F9-B391-A9AF652E4BAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B4266D5E-0080-45F9-B391-A9AF652E4BAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B4266D5E-0080-45F9-B391-A9AF652E4BAE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E70997F0-49EC-4BA4-9869-8DDC6D498884}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E70997F0-49EC-4BA4-9869-8DDC6D498884}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E70997F0-49EC-4BA4-9869-8DDC6D498884}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E70997F0-49EC-4BA4-9869-8DDC6D498884}.Release|Any CPU.Build.0 = Release|Any CPU
+		{378F1BEA-FB9A-4ACA-B6BF-C8244CA39769}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{378F1BEA-FB9A-4ACA-B6BF-C8244CA39769}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{378F1BEA-FB9A-4ACA-B6BF-C8244CA39769}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{378F1BEA-FB9A-4ACA-B6BF-C8244CA39769}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
