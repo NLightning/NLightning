@@ -105,7 +105,7 @@ namespace NLightning.Node
             Services.GetService<IPenaltyService>().Initialize(NetworkParameters);
             Services.GetService<IBlockchainClientService>().Initialize(_walletKey, NetworkParameters);
             Services.GetService<INetworkViewService>().Initialize();
-            Services.GetService<INetworkViewSyncService>().Initialize();
+            Services.GetService<INetworkViewSyncService>().Initialize(NetworkParameters);
             Services.GetService<IPeerService>().Initialize(LocalKey);
             Services.GetService<IChannelStateService>().Initialize();
             Services.GetService<IChannelService>().Initialize(NetworkParameters);

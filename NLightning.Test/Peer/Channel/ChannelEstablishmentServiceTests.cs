@@ -105,6 +105,20 @@ namespace NLightning.Test.Peer.Channel
             return true;
         }
 
+        [Fact]
+        public void OnAcceptChannelMessageTest()
+        {
+            var mocks = new Mocks();
+
+            mocks.SetupMocks();
+            mocks.ChannelService.Setup(c => c.Channels).Returns(() => new List<LocalChannel>() {}.AsReadOnly());
+
+            var service = mocks.CreateServiceMock();
+            service.Initialize(NetworkParameters.BitcoinTestnet);
+            
+            
+        }
+        
         private class Mocks
         {
             public Mocks()
@@ -146,6 +160,7 @@ namespace NLightning.Test.Peer.Channel
             public void SetupMocks()
             {
                 PeerService.Setup(p => p.IncomingMessageProvider).Returns(() => new Subject<(IPeer, Message)>());
+                PeerService.Setup(p => p.ValidationExceptionProvider).Returns(() => new Subject<(IPeer, MessageValidationException)>());
                 BlockchainMonitorService.Setup(p => p.ByTransactionIdProvider).Returns(() => new Subject<Transaction>());
                 ChannelService.Setup(c => c.Channels).Returns(() => new List<LocalChannel>().AsReadOnly());
                 Peer.Setup(c => c.Messaging).Returns(() => MessagingClient.Object);

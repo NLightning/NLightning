@@ -22,7 +22,7 @@ namespace NLightning.Peer
             _logger = loggerFactory.CreateNodeAddressLogger(GetType(), remoteNodeAddress);
             _localKeyPair = localKeyPair;
             _remoteNodeAddress = remoteNodeAddress;
-            _peerState = new PeerState(new PeerFeatures(false, false, false, false, false, false, false));
+            _peerState = new PeerState(new PeerFeatures(false, false, false, false, false, false, true));
             _messagingClient = new MessagingClient(loggerFactory, messageValidators, _peerState, _localKeyPair, remoteNodeAddress);
         }
 

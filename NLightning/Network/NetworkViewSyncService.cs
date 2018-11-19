@@ -3,14 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Serialization;
 using NLightning.Network.Configuration;
 using NLightning.Network.GossipMessages;
 using NLightning.Network.Models;
 using NLightning.Network.QueryMessages;
-using NLightning.OnChain;
 using NLightning.OnChain.Client;
 using NLightning.Peer;
 using NLightning.Persistence;
@@ -21,6 +20,7 @@ namespace NLightning.Network
 {
     public class NetworkViewSyncService : INetworkViewSyncService, IDisposable
     {
+        private static readonly int ChannelSynchronisationBatchSize = 100;
         private readonly ILogger _logger;
         private readonly object _syncLock = new object();
         private readonly IPeerService _peerService;
@@ -31,30 +31,36 @@ namespace NLightning.Network
         private readonly List<(IPeer, ChannelAnnouncementMessage)> _pendingChannelAnnouncementMessages = new List<(IPeer, ChannelAnnouncementMessage)>();
         private readonly List<(IPeer, ChannelUpdateMessage)> _pendingChannelUpdateMessages = new List<(IPeer, ChannelUpdateMessage)>();
         private readonly INetworkViewService _networkViewService;
-        private readonly IBlockchainService _blockchainService;
+        private readonly Subject<float> _syncProgressPercentageProvider = new Subject<float>();
         private EventLoopScheduler _eventLoopScheduler;
         private NetworkPersistenceContext _dbContext;
         private NetworkView _view;
+        private NetworkParameters _networkParameters;
+        private NetworkSyncDetails _ongoingSynchronisation;
         
-        public NetworkViewSyncService(ILoggerFactory loggerFactory, INetworkViewService networkViewService, IBlockchainService blockchainService,
+        public NetworkViewSyncService(ILoggerFactory loggerFactory, INetworkViewService networkViewService, 
                                     IPeerService peerService, IConfiguration configuration, IBlockchainClientService blockchainClientService)
         {
             _networkViewService = networkViewService;
             _dbContext = networkViewService.NetworkPersistenceContext;
-            _blockchainService = blockchainService;
             _logger = loggerFactory.CreateLogger(GetType());
             _peerService = peerService;
             _blockchainClientService = blockchainClientService;
             _configuration = configuration.GetConfiguration<NetworkViewConfiguration>();
         }
 
-        public void Initialize()
+        public bool Synchronised { get; private set; }
+        public float SyncProgressPercentage { get; private set; }
+        public IObservable<float> SyncProgressPercentageProvider => _syncProgressPercentageProvider;
+
+        public void Initialize(NetworkParameters networkParameters)
         {
             if (_configuration.SynchronisationMode != SynchronisationMode.Automatic)
             {
                 return;
             }
 
+            _networkParameters = networkParameters;
             _eventLoopScheduler = new EventLoopScheduler();
             _view = _networkViewService.View;
 
@@ -75,7 +81,7 @@ namespace NLightning.Network
 
         private void InitTimer()
         {
-            _subscriptions.Add(_eventLoopScheduler.SchedulePeriodic(_configuration.UpdateInterval, UpdateView));
+            _subscriptions.Add(_eventLoopScheduler.SchedulePeriodic(_configuration.UpdateInterval, Update));
         }
         
         private void SubscribeToEvents()
@@ -84,24 +90,29 @@ namespace NLightning.Network
                 .ObserveOn(_eventLoopScheduler)
                 .Subscribe(message =>
                 {
-                    if (message.Item2 is ChannelAnnouncementMessage channelAnnouncementMessage)
+                    if (message.Message is ChannelAnnouncementMessage channelAnnouncementMessage)
                     {
-                        OnChannelAnnouncement(message.Item1, channelAnnouncementMessage);
+                        OnChannelAnnouncement(message.Peer, channelAnnouncementMessage);
                     }
                     
-                    if (message.Item2 is ChannelUpdateMessage channelUpdateMessage)
+                    if (message.Message is ChannelUpdateMessage channelUpdateMessage)
                     {
-                        OnChannelUpdateMessage(message.Item1, channelUpdateMessage);
+                        OnChannelUpdateMessage(message.Peer, channelUpdateMessage);
                     }
                     
-                    if (message.Item2 is NodeAnnouncementMessage nodeAnnouncementMessage)
+                    if (message.Message is NodeAnnouncementMessage nodeAnnouncementMessage)
                     {
-                        OnNodeAnnouncement(message.Item1, nodeAnnouncementMessage);
+                        OnNodeAnnouncement(message.Peer, nodeAnnouncementMessage);
                     }
                     
-                    if (message.Item2 is ReplyQueryChannelRangeMessage replyQueryChannelRangeMessage)
+                    if (message.Message is ReplyQueryChannelRangeMessage replyQueryChannelRangeMessage)
                     {
-                        OnReplyQueryChannelRange(message.Item1, replyQueryChannelRangeMessage);
+                        OnReplyQueryChannelRange(message.Peer, replyQueryChannelRangeMessage);
+                    }
+                   
+                    if (message.Message is ReplyShortChannelIdsDoneMessage replyShortChannelIdsDoneMessage)
+                    {
+                        OnReplyShortChannelIdsDoneMessage(message.Peer, replyShortChannelIdsDoneMessage);
                     }
                 }));
 
@@ -109,9 +120,48 @@ namespace NLightning.Network
                 .Delay(TimeSpan.FromSeconds(5))
                 .ObserveOn(_eventLoopScheduler)
                 .Where(tuple => tuple.Item2 == MessagingClientState.Active)
-                .Subscribe(peerMessage => SyncWithPeer(peerMessage.Item1)));
+                .Subscribe(peerMessage => SyncWithPeer(peerMessage.Peer)));
         }
 
+        private void Update()
+        {
+            CheckSynchronisation();
+            UpdateView();
+        }
+
+        private void CheckSynchronisation()
+        {
+            var synchronisation = _ongoingSynchronisation;
+            if (synchronisation == null)
+            {
+                if (!Synchronised)
+                {
+                    SyncWithRandomPeer();
+                }
+                
+                return;
+            }
+
+            if (synchronisation.StartTime + _configuration.SynchronisationTimeout < DateTime.Now)
+            {
+                _logger.LogWarning($"Synchronisation with {synchronisation.Peer.NodeAddress} failed: Timeout");
+                _ongoingSynchronisation = null;
+                SyncWithRandomPeer();
+            }
+        }
+
+        private void SyncWithRandomPeer()
+        {
+            var peerToSync = _peerService.Peers.Where(p => p.State.PeerFeatures.OptionalGossipQueries)
+                .OrderBy(a => Guid.NewGuid())
+                .FirstOrDefault();
+
+            if (peerToSync != null)
+            {
+                SyncWithPeer(peerToSync);
+            }
+        }
+        
         private void UpdateView()
         {
             try
@@ -265,35 +315,85 @@ namespace NLightning.Network
 
             return channelsToPrune;
         }
+        
+        
+        private void SyncWithPeer(IPeer peer)
+        {
+            if (_ongoingSynchronisation != null || !peer.State.PeerFeatures.OptionalGossipQueries)
+            {
+                return;
+            }
+            
+            uint firstBlockNumber = GetFirstBlockNumber();
+            int lastBlockNumber = _blockchainClientService.GetBlockCount() + 1;
+            _ongoingSynchronisation = new NetworkSyncDetails(peer, lastBlockNumber);
+            _logger.LogDebug($"Synchronize network view with peer {peer.NodeAddress}. Sync Blocks from {firstBlockNumber} to {lastBlockNumber}");
+            peer.Messaging.Send(new QueryChannelRangeMessage(_networkParameters.ChainHash, firstBlockNumber, (uint)lastBlockNumber));
+        }
 
         private void OnReplyQueryChannelRange(IPeer peer, ReplyQueryChannelRangeMessage message)
         {
-            _logger.LogDebug($"Received ReplyQueryChannelRangeMessage with {message.ShortIds.Count} channel ids.");
-            var state = GetOrCreatePeerState(peer.PublicKey);
-            var syncToBlock = Math.Min(message.FirstBlockNumber + message.NumberOfBlocks, _blockchainClientService.GetBlockCount());
-            
-            state.UpdateBlockNumber((uint)syncToBlock);
-            _dbContext.SaveChanges();
-            
-            SyncChannels(peer, message.ShortIds.ToList());
-        }
-
-        private void SyncChannels(IPeer peer, List<byte[]> shortChannelIds)
-        {
-            foreach (var channelIds in shortChannelIds.Batch(1000))
+            var synchronisation = _ongoingSynchronisation;
+            if (synchronisation == null || synchronisation.Peer != peer)
             {
-                var list = channelIds.ToList();
-                _logger.LogDebug($"Query {list.Count} channel ids.");
-                peer.Messaging.Send(new QueryShortChannelIdsMessage(_blockchainService.NetworkParameters.ChainHash, list, false));
+                _logger.LogWarning($"Received {nameof(ReplyQueryChannelRangeMessage)} but there is no ongoing synchronisation.");
+                return;
+            }
+            
+            _logger.LogDebug($"Received ReplyQueryChannelRangeMessage with {message.ShortIds.Count} channel ids.");
+            synchronisation.ShortChannelIds.AddRange(message.ShortIds);
+            SyncNextChannels(peer, synchronisation);
+        }
+        
+        private void OnReplyShortChannelIdsDoneMessage(IPeer peer, ReplyShortChannelIdsDoneMessage message)
+        {
+            var synchronisation = _ongoingSynchronisation;
+            if (synchronisation == null || synchronisation.Peer != peer)
+            {
+                _logger.LogWarning($"Received {nameof(ReplyShortChannelIdsDoneMessage)} but there is no ongoing synchronisation.");
+                return;
+            }
+
+            UpdateSyncPercentage(synchronisation);
+            
+            if (synchronisation.ShortChannelIdsPosition >= synchronisation.ShortChannelIds.Count)
+            {
+                FinishSynchronisation(peer, synchronisation);
+            }
+            else
+            {
+                SyncNextChannels(peer, synchronisation);
             }
         }
 
-        private void SyncWithPeer(IPeer peer)
+        private void SyncNextChannels(IPeer peer, NetworkSyncDetails synchronisation)
         {
-            uint firstBlockNumber = GetFirstBlockNumber();
-            int lastBlockNumber = _blockchainClientService.GetBlockCount() + 1;
-            _logger.LogDebug($"Synchronize network view with peer {peer.NodeAddress}. Sync Blocks from {firstBlockNumber} to {lastBlockNumber}");
-            peer.Messaging.Send(new QueryChannelRangeMessage(_blockchainService.NetworkParameters.ChainHash, firstBlockNumber, (uint)lastBlockNumber));
+            List<byte[]> channelsToSync = synchronisation.ShortChannelIds
+                                        .Skip(synchronisation.ShortChannelIdsPosition)
+                                        .Take(ChannelSynchronisationBatchSize).ToList();
+            
+            _logger.LogDebug($"Query {channelsToSync.Count} channel ids.");
+            peer.Messaging.Send(new QueryShortChannelIdsMessage(_networkParameters.ChainHash, channelsToSync, false));
+            synchronisation.ShortChannelIdsPosition += ChannelSynchronisationBatchSize;
+        }
+
+        private void UpdateSyncPercentage(NetworkSyncDetails synchronisation)
+        {
+            var percentage = (float) synchronisation.ShortChannelIdsPosition / synchronisation.ShortChannelIds.Count;
+            SyncProgressPercentage = percentage > 1 ? 1 : percentage;
+            _syncProgressPercentageProvider.OnNext(SyncProgressPercentage);
+        }
+
+        private void FinishSynchronisation(IPeer peer, NetworkSyncDetails synchronisation)
+        {
+            var peerState = GetOrCreatePeerState(peer.PublicKey);
+            peerState.UpdateBlockNumber((uint) synchronisation.SyncToBlock);
+            _dbContext.SaveChanges();
+
+            _logger.LogInformation($"Synchronisation with {peer.NodeAddress} done. Received channels: {synchronisation.ShortChannelIds.Count}");
+            _ongoingSynchronisation = null;
+            Synchronised = true;
+            SyncProgressPercentage = 1;
         }
 
         private uint GetFirstBlockNumber()
@@ -306,7 +406,7 @@ namespace NLightning.Network
             return _dbContext.PeerStates
                 .Select(ps => ps.LastBlockNumber)
                 .OrderByDescending(blockNumber => blockNumber)
-                .Take(2).Last();
+                .Last();
         }
         
         private PeerNetworkViewState GetOrCreatePeerState(string publicKey)
@@ -346,6 +446,22 @@ namespace NLightning.Network
             _subscriptions.Clear();
             _dbContext.Dispose();
             _eventLoopScheduler?.Dispose();
+        }
+        
+        private class NetworkSyncDetails
+        {
+            public NetworkSyncDetails(IPeer peer, int syncToBlock)
+            {
+                Peer = peer;
+                SyncToBlock = syncToBlock;
+                StartTime = DateTime.Now;
+            }
+
+            public DateTime StartTime { get; }
+            public IPeer Peer { get; }
+            public int SyncToBlock { get; }
+            public List<byte[]> ShortChannelIds { get; } = new List<byte[]>();
+            public int ShortChannelIdsPosition { get; set; }
         }
     }
 }

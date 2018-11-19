@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using NLightning.Transport.Messaging;
 using NLightning.Utils.Extensions;
 
 namespace NLightning.Utils
@@ -29,10 +30,14 @@ namespace NLightning.Utils
             {
                 decompressed = data;
             }
-            else
+            else if (encoded[0] == 1)
             {
                 ZLibCompression zLibCompression = new ZLibCompression();
                 decompressed = zLibCompression.Decompress(data.ToArray());
+            }
+            else
+            {
+                throw new MessageNotSupportedException("Compression type not supported.");
             }
 
             List<byte[]> shortIds = new List<byte[]>();

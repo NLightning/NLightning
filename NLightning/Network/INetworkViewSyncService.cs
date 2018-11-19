@@ -1,7 +1,13 @@
+using System;
+
 namespace NLightning.Network
 {
     public interface INetworkViewSyncService
     {
-        void Initialize();
+        bool Synchronised { get; } 
+        float SyncProgressPercentage { get; } 
+        IObservable<float> SyncProgressPercentageProvider { get; }
+        
+        void Initialize(NetworkParameters networkParameters);
     }
 }
