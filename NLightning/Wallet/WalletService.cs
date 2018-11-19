@@ -19,7 +19,7 @@ namespace NLightning.Wallet
         }
         
         public ECKeyPair Key => _key;
-        public BitcoinPubKeyAddress PubKeyAddress => _key.ToPubKey().GetAddress(NBitcoin.Network.GetNetwork(_networkParameters.Name));
+        public BitcoinPubKeyAddress PubKeyAddress => _key.ToPubKey().GetAddress(_networkParameters.Network);
         public byte[] ShutdownScriptPubKey => PubKeyAddress.ScriptPubKey.ToBytes();
 
         public void Initialize(ECKeyPair key, NetworkParameters networkParameters)

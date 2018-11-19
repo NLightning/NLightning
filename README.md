@@ -118,7 +118,7 @@ channelStateService.ChannelActiveStateChangedProvider
 ```C#
 IChannelCloseService closeService = node.Services.GetService<IChannelCloseService>();
 
-// mutual close, if peer is not available do a unilateral close:
+// mutual close, if peer is not available do an unilateral close:
 closeService.Close(channel, unilateralCloseOnUnavailability: true);
 
 // unilateral close:

@@ -16,6 +16,7 @@ using NLightning.Peer.Channel.Configuration;
 using NLightning.Peer.Channel.Logging;
 using NLightning.Peer.Channel.Logging.Models;
 using NLightning.Peer.Channel.Models;
+using NLightning.Transport.Messaging;
 using NLightning.Transport.Messaging.SetupMessages;
 using NLightning.Utils;
 using NLightning.Utils.Extensions;
@@ -108,6 +109,11 @@ namespace NLightning.Peer.Channel
                 .Where(m => m.Message is FundingLockedMessage)
                 .Subscribe(peerMessage =>
                     OnFundingLockedMessage(peerMessage.Peer, (FundingLockedMessage) peerMessage.Message)));
+            
+            _subscriptions.Add(_peerService.ValidationExceptionProvider
+                .ObserveOn(_taskScheduler)
+                .Subscribe(peerMessage =>
+                    OnValidationException(peerMessage.Peer, peerMessage.ValidationException)));
             
             _subscriptions.Add(_blockchainMonitorService.ByTransactionIdProvider
                 .ObserveOn(_taskScheduler)
@@ -211,15 +217,15 @@ namespace NLightning.Peer.Channel
 
         private void OnFundingSignedMessage(IPeer peer, FundingSignedMessage message)
         {
-            var establishment = _channelService.PendingChannels.SingleOrDefault(est => est.Peer == peer && est.Channel.ChannelId == message.ChannelId.ToHex());
-            if (establishment == null)
+            var pendingChannel = _channelService.PendingChannels.SingleOrDefault(est => est.Peer == peer && est.Channel != null && est.Channel.ChannelId == message.ChannelId.ToHex());
+            if (pendingChannel == null)
             {
                 _logger.LogError($"Remote sent us an {nameof(FundingSignedMessage)}, but there are no matching pending channels.");
                 peer.Messaging.Send(ErrorMessage.UnknownChannel(message.ChannelId));
                 return;
             }
 
-            var channel = establishment.Channel;
+            var channel = pendingChannel.Channel;
             var oldState = channel.State;
             var signature = SignatureConverter.RawToTransactionSignature(message.Signature);
 
@@ -229,6 +235,7 @@ namespace NLightning.Peer.Channel
                 string error = "Invalid commitment transaction signature.";
                 channel.State = LocalChannelState.FundingFailed;
                 peer.Messaging.Send(new ErrorMessage(message.ChannelId, error));
+                ChannelEstablishmentFailed(peer, pendingChannel, error);
                 return;
             }
             
@@ -237,7 +244,7 @@ namespace NLightning.Peer.Channel
             _channelService.AddChannel(peer, channel);
             _fundingService.BroadcastFundingTransaction(channel);
             WatchForFundingTransaction(channel);
-            _channelService.RemovePendingChannel(establishment);
+            _channelService.RemovePendingChannel(pendingChannel);
             _channelLoggingService.LogStateUpdate(channel, oldState);
         }
         
@@ -307,6 +314,27 @@ namespace NLightning.Peer.Channel
         private void ChannelEstablishmentSuccessful(IPeer peer, LocalChannel channel)
         {
             _successProvider.OnNext((peer, channel));
+        }
+        
+        private void ChannelEstablishmentFailed(IPeer peer, PendingChannel pendingChannel, string errorMessage)
+        {
+            _channelService.RemovePendingChannel(pendingChannel);
+            _failedProvider.OnNext((peer, pendingChannel, errorMessage));
+        }
+        
+        private void OnValidationException(IPeer peer, MessageValidationException exception)
+        {
+            if (exception.FailChannelId == null)
+            {
+                return;
+            }
+
+            var channelId = exception.FailChannelId.ToHex();
+            var pendingChannel = _channelService.PendingChannels.SingleOrDefault(est => est.Peer == peer && est.TemporaryChannelId == channelId);
+            if (pendingChannel != null)
+            {
+                ChannelEstablishmentFailed(peer, pendingChannel, exception.Message);
+            }
         }
 
         private void OnFundingLockedMessage(IPeer peer, FundingLockedMessage message)
