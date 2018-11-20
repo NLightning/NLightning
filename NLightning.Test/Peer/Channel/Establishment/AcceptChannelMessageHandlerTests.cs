@@ -13,7 +13,7 @@ using Xunit;
 
 namespace NLightning.Test.Peer.Channel.Establishment
 {
-    public class AcceptChannelMessageHandlerTest
+    public class AcceptChannelMessageHandlerTests
     {
         [Fact]
         public void HandleTest()

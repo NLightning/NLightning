@@ -67,7 +67,7 @@ namespace NLightning.Peer.Channel.Establishment
             _configuration = configuration.GetConfiguration<ChannelConfiguration>();
             _acceptChannelMessageHandler = new AcceptChannelMessageHandler(_channelLoggingService, _fundingService, _commitmentService);
             _fundingMessageSignedHandler = new FundingMessageSignedHandler(_channelLoggingService, _fundingService, _commitmentService, _channelService, _blockchainMonitorService);
-            _fundingMessageLockedHandler = new FundingMessageLockedHandler();
+            _fundingMessageLockedHandler = new FundingMessageLockedHandler(_channelLoggingService, _commitmentService, _channelService);
         }
 
         public IObservable<(IPeer, PendingChannel, string)> FailureProvider => _failedProvider;
@@ -240,27 +240,15 @@ namespace NLightning.Peer.Channel.Establishment
                 _channelLoggingService.LogError(channel, LocalChannelError.InvalidState, $"Can't lock funding. Current state is: {channel.State}");
                 return;
             }
-            
-            channel.State = channel.State == LocalChannelState.FundingLocked ? LocalChannelState.NormalOperation : LocalChannelState.FundingLocked;
-            channel.LocalCommitmentTxParameters.NextPerCommitmentPoint = _commitmentService.GetNextLocalPerCommitmentPoint(channel);
-            
-            _channelService.UpdateChannel(channel);
-            SendFundingLocked(peer, channel);
 
+            _fundingMessageLockedHandler.HandleLocalFundingLocked(peer, channel);
+            
             if (channel.State == LocalChannelState.NormalOperation)
             {
                 ChannelEstablishmentSuccessful(peer, channel);
             }
             
             _channelLoggingService.LogStateUpdate(channel, oldState);
-        }
-
-        private void SendFundingLocked(IPeer peer, LocalChannel channel)
-        {
-            FundingLockedMessage message = new FundingLockedMessage();
-            message.ChannelId = channel.ChannelId.HexToByteArray();
-            message.NextPerCommitmentPoint = _commitmentService.GetNextLocalPerCommitmentPoint(channel);
-            peer.Messaging.Send(message);
         }
 
         private void ChannelEstablishmentSuccessful(IPeer peer, LocalChannel channel)
@@ -299,23 +287,9 @@ namespace NLightning.Peer.Channel.Establishment
                 return;
             }
 
-            if (channel.State == LocalChannelState.NormalOperation && channel.RemoteCommitmentTxParameters.TransactionNumber == 0)
-            {
-                _channelLoggingService.LogInfo(channel, $"Remote sent us a {nameof(FundingLockedMessage)} but we are already in Normal Operation state. " +
-                                                        "We will answer with a funding locked message.");
-                SendFundingLocked(peer, channel);
-                return;
-            }
-            
-            if (channel.State != LocalChannelState.FundingSigned && channel.State != LocalChannelState.FundingLocked)
-            {
-                _channelLoggingService.LogWarning(channel, $"Remote sent us a {nameof(FundingLockedMessage)}, but the current state is {channel.State}");
-                return;
-            }
-            
             var oldState = channel.State;
 
-            _fundingMessageLockedHandler.Handle(message, channel);
+            _fundingMessageLockedHandler.HandleRemoteFundingLocked(peer, message, channel);
             _channelService.UpdateChannel(channel);
             
             if (channel.State == LocalChannelState.NormalOperation)
