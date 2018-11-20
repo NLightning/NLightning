@@ -49,6 +49,7 @@ namespace NLightning.Network
             _configuration = configuration.GetConfiguration<NetworkViewConfiguration>();
         }
 
+        public NetworkView View => _view;
         public bool Synchronised { get; private set; }
         public float SyncProgressPercentage { get; private set; }
         public IObservable<float> SyncProgressPercentageProvider => _syncProgressPercentageProvider;
@@ -142,7 +143,7 @@ namespace NLightning.Network
                 return;
             }
 
-            if (synchronisation.StartTime + _configuration.SynchronisationTimeout < DateTime.Now)
+            if (synchronisation.LastUpdate + _configuration.SynchronisationTimeout < DateTime.Now)
             {
                 _logger.LogWarning($"Synchronisation with {synchronisation.Peer.NodeAddress} failed: Timeout");
                 _ongoingSynchronisation = null;
@@ -339,10 +340,21 @@ namespace NLightning.Network
                 _logger.LogWarning($"Received {nameof(ReplyQueryChannelRangeMessage)} but there is no ongoing synchronisation.");
                 return;
             }
+
+            if (synchronisation.ShortChannelIds.Count == 0 && message.ShortIds.Count == 0 && message.Complete)
+            {
+                FinishSynchronisation(peer, synchronisation);
+                return;
+            }
             
-            _logger.LogDebug($"Received ReplyQueryChannelRangeMessage with {message.ShortIds.Count} channel ids.");
+            synchronisation.ResetLastUpdate();
+            _logger.LogDebug($"Received {nameof(ReplyQueryChannelRangeMessage)} with {message.ShortIds.Count} channel ids.");
             synchronisation.ShortChannelIds.AddRange(message.ShortIds);
-            SyncNextChannels(peer, synchronisation);
+            
+            if (message.Complete)
+            {
+                SyncNextChannels(peer, synchronisation);
+            }
         }
         
         private void OnReplyShortChannelIdsDoneMessage(IPeer peer, ReplyShortChannelIdsDoneMessage message)
@@ -355,6 +367,7 @@ namespace NLightning.Network
             }
 
             UpdateSyncPercentage(synchronisation);
+            synchronisation.ResetLastUpdate();
             
             if (synchronisation.ShortChannelIdsPosition >= synchronisation.ShortChannelIds.Count)
             {
@@ -406,7 +419,7 @@ namespace NLightning.Network
             return _dbContext.PeerStates
                 .Select(ps => ps.LastBlockNumber)
                 .OrderByDescending(blockNumber => blockNumber)
-                .Last();
+                .First();
         }
         
         private PeerNetworkViewState GetOrCreatePeerState(string publicKey)
@@ -437,8 +450,6 @@ namespace NLightning.Network
         {
             _pendingChannelAnnouncementMessages.Add((peer, message));
         }
-       
-        public NetworkView View => _view;
 
         public void Dispose()
         {
@@ -454,14 +465,18 @@ namespace NLightning.Network
             {
                 Peer = peer;
                 SyncToBlock = syncToBlock;
-                StartTime = DateTime.Now;
             }
-
-            public DateTime StartTime { get; }
+            
+            public DateTime LastUpdate { get; private set; }  = DateTime.Now;
             public IPeer Peer { get; }
             public int SyncToBlock { get; }
             public List<byte[]> ShortChannelIds { get; } = new List<byte[]>();
             public int ShortChannelIdsPosition { get; set; }
+
+            public void ResetLastUpdate()
+            {
+                LastUpdate = DateTime.Now;
+            }
         }
     }
 }
