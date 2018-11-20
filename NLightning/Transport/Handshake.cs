@@ -239,15 +239,20 @@ namespace NLightning.Transport
 
         public async Task ReadHandshake(NetworkStream stream)
         {
-            var buffer = new byte[66];
             int bytesRead = -1;
 
             while (bytesRead != 0 && _state.HandshakeState != HandshakeState.Finished)
             {
-                bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
-                if (bytesRead > 0)
+                int handshakeSize = _state.HandshakeState == HandshakeState.Act2 ? 66 : 50;
+                byte[] handshakeData = await stream.ReadExactly(handshakeSize);
+                
+                if (handshakeData.Length > 0)
                 {
-                    ReadAndWriteHandshake(buffer, bytesRead, stream);
+                    ReadAndWriteHandshake(handshakeData, handshakeData.Length, stream);
+                }
+                else
+                {
+                    return;
                 }
             }
         }
