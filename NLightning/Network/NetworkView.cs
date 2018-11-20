@@ -19,7 +19,7 @@ namespace NLightning.Network
         public NetworkView(ILoggerFactory loggerFactory, List<PeerNetworkViewState> viewStates, List<NetworkNode> nodes, List<NetworkChannel> channels)
         {
             _logger = loggerFactory.CreateLogger<NetworkView>();
-            _viewStates = viewStates.ToDictionary(n => n.PeerPublicKey, n => n);
+            _viewStates = viewStates.ToDictionary(n => n.PeerNetworkAddress, n => n);
             _nodes = nodes.ToDictionary(n => n.Id, n => n);
             _channels = channels.ToDictionary(n => n.Id, n => n);
         }
@@ -128,7 +128,7 @@ namespace NLightning.Network
         {
             lock (_syncObject)
             {
-                _viewStates.TryAdd(state.PeerPublicKey, state);
+                _viewStates.TryAdd(state.PeerNetworkAddress, state);
             }
         }
     }

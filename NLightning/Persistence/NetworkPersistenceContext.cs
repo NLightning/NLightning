@@ -21,7 +21,7 @@ namespace NLightning.Persistence
         private static void BuildPeerNetworkViewStateModel(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<PeerNetworkViewState>()
-                .HasKey(c => c.PeerPublicKey);
+                .HasKey(c => c.PeerNetworkAddress);
         }
 
         private static void BuildNetworkNodeModel(ModelBuilder modelBuilder)

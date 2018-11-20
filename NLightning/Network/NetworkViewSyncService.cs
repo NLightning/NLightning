@@ -120,7 +120,7 @@ namespace NLightning.Network
             _subscriptions.Add(_peerService.MessagingStateProvider
                 .Delay(TimeSpan.FromSeconds(5))
                 .ObserveOn(_eventLoopScheduler)
-                .Where(tuple => tuple.Item2 == MessagingClientState.Active)
+                .Where(tuple => tuple.State == MessagingClientState.Active)
                 .Subscribe(peerMessage => SyncWithPeer(peerMessage.Peer)));
         }
 
@@ -214,17 +214,17 @@ namespace NLightning.Network
         }
 
         private (List<NetworkChannel>, List<NetworkNode>) CreateOrUpdateChannels(NetworkView view,
-            List<(IPeer, ChannelAnnouncementMessage)> channelMessages,
-            List<(IPeer, ChannelUpdateMessage)> channelUpdateMessages, Dictionary<string, NetworkNode> newNodes)
+            List<(IPeer Peer, ChannelAnnouncementMessage Message)> channelMessages,
+            List<(IPeer Peer, ChannelUpdateMessage Message)> channelUpdateMessages, Dictionary<string, NetworkNode> newNodes)
         {
             var channels = view.GetChannels();
             var nodes = view.GetNodes();
             var newChannels = new List<NetworkChannel>();
-            var pendingUpdateMessages = channelUpdateMessages.Select(m => m.Item2).ToList();
-            foreach (var message in channelMessages.GroupBy(cm => cm.Item2.ShortChannelIdHex).Select(y => y.Last()))
+            var pendingUpdateMessages = channelUpdateMessages.Select(m => m.Message).ToList();
+            foreach (var message in channelMessages.GroupBy(cm => cm.Message.ShortChannelIdHex).Select(y => y.Last()))
             {
-                var channel = channels.GetValueOrDefault(message.Item2.ShortChannelIdHex);
-                var channelUpdateMessage = pendingUpdateMessages.LastOrDefault(m => m.ShortChannelIdHex == message.Item2.ShortChannelIdHex);
+                var channel = channels.GetValueOrDefault(message.Message.ShortChannelIdHex);
+                var channelUpdateMessage = pendingUpdateMessages.LastOrDefault(m => m.ShortChannelIdHex == message.Message.ShortChannelIdHex);
 
                 if (channel != null && channelUpdateMessage != null)
                 {
@@ -233,9 +233,9 @@ namespace NLightning.Network
                 
                 if (channel == null && channelUpdateMessage != null)
                 {
-                    var node1 = GetOrCreateNode(nodes, message.Item2.NodeId1Hex, newNodes);
-                    var node2 = GetOrCreateNode(nodes, message.Item2.NodeId2Hex, newNodes);
-                    channel = NetworkChannel.Create(message.Item2, channelUpdateMessage, node1, node2);
+                    var node1 = GetOrCreateNode(nodes, message.Message.NodeId1Hex, newNodes);
+                    var node2 = GetOrCreateNode(nodes, message.Message.NodeId2Hex, newNodes);
+                    channel = NetworkChannel.Create(message.Message, channelUpdateMessage, node1, node2);
                     node1.Node1Channels.Add(channel);
                     node2.Node2Channels.Add(channel);
                     newChannels.Add(channel);
@@ -274,20 +274,20 @@ namespace NLightning.Network
             return node;
         }
 
-        private Dictionary<string, NetworkNode> CreateOrUpdateNodes(NetworkView view, List<(IPeer, NodeAnnouncementMessage)> nodeAnnouncementMessages)
+        private Dictionary<string, NetworkNode> CreateOrUpdateNodes(NetworkView view, List<(IPeer Peer, NodeAnnouncementMessage Message)> nodeAnnouncementMessages)
         {
             var nodes = view.GetNodes();
             var newNodes = new Dictionary<string, NetworkNode>();
-            foreach (var message in nodeAnnouncementMessages.GroupBy(cm => cm.Item2.NodeIdHex).Select(y => y.Last()))
+            foreach (var message in nodeAnnouncementMessages.GroupBy(cm => cm.Message.NodeIdHex).Select(y => y.Last()))
             {
-                var existingNode = nodes.GetValueOrDefault(message.Item2.NodeIdHex);
+                var existingNode = nodes.GetValueOrDefault(message.Message.NodeIdHex);
                 if (existingNode != null)
                 {
-                    existingNode.Update(message.Item2);
+                    existingNode.Update(message.Message);
                 }
                 else
                 {
-                    newNodes.Add(message.Item2.NodeIdHex, NetworkNode.Create(message.Item2));
+                    newNodes.Add(message.Message.NodeIdHex, NetworkNode.Create(message.Message));
                 }
             }
 
@@ -328,6 +328,8 @@ namespace NLightning.Network
             uint firstBlockNumber = GetFirstBlockNumber();
             int lastBlockNumber = _blockchainClientService.GetBlockCount() + 1;
             _ongoingSynchronisation = new NetworkSyncDetails(peer, lastBlockNumber);
+            UpdateSyncPercentage(_ongoingSynchronisation);
+            
             _logger.LogDebug($"Synchronize network view with peer {peer.NodeAddress}. Sync Blocks from {firstBlockNumber} to {lastBlockNumber}");
             peer.Messaging.Send(new QueryChannelRangeMessage(_networkParameters.ChainHash, firstBlockNumber, (uint)lastBlockNumber));
         }
@@ -386,7 +388,7 @@ namespace NLightning.Network
                                         .Take(ChannelSynchronisationBatchSize).ToList();
             
             _logger.LogDebug($"Query {channelsToSync.Count} channel ids.");
-            peer.Messaging.Send(new QueryShortChannelIdsMessage(_networkParameters.ChainHash, channelsToSync, false));
+            peer.Messaging.Send(new QueryShortChannelIdsMessage(_networkParameters.ChainHash, channelsToSync, true));
             synchronisation.ShortChannelIdsPosition += ChannelSynchronisationBatchSize;
         }
 
@@ -399,7 +401,7 @@ namespace NLightning.Network
 
         private void FinishSynchronisation(IPeer peer, NetworkSyncDetails synchronisation)
         {
-            var peerState = GetOrCreatePeerState(peer.PublicKey);
+            var peerState = GetOrCreatePeerState(peer.NodeAddress.Address);
             peerState.UpdateBlockNumber((uint) synchronisation.SyncToBlock);
             _dbContext.SaveChanges();
 
@@ -422,12 +424,12 @@ namespace NLightning.Network
                 .First();
         }
         
-        private PeerNetworkViewState GetOrCreatePeerState(string publicKey)
+        private PeerNetworkViewState GetOrCreatePeerState(string networkAddress)
         {
-            var state = _view.GetPeerStates().GetValueOrDefault(publicKey);
+            var state = _view.GetPeerStates().GetValueOrDefault(networkAddress);
             if (state == null)
             {
-                state = new PeerNetworkViewState { PeerPublicKey = publicKey } ;
+                state = new PeerNetworkViewState { PeerNetworkAddress = networkAddress } ;
                 _view.AddPeerState(state);
                 _dbContext.PeerStates.Add(state);
                 _dbContext.SaveChanges();
