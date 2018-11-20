@@ -394,8 +394,16 @@ namespace NLightning.Network
 
         private void UpdateSyncPercentage(NetworkSyncDetails synchronisation)
         {
-            var percentage = (float) synchronisation.ShortChannelIdsPosition / synchronisation.ShortChannelIds.Count;
-            SyncProgressPercentage = percentage > 1 ? 1 : percentage;
+            if (synchronisation.ShortChannelIds.Count > 0)
+            {
+                var percentage = (float) synchronisation.ShortChannelIdsPosition / synchronisation.ShortChannelIds.Count;
+                SyncProgressPercentage = percentage > 1 ? 1 : percentage;
+            }
+            else
+            {
+                SyncProgressPercentage = 1;
+            }
+            
             _syncProgressPercentageProvider.OnNext(SyncProgressPercentage);
         }
 

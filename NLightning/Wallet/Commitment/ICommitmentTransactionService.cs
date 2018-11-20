@@ -1,7 +1,7 @@
 using NBitcoin;
 using NLightning.Cryptography;
 using NLightning.Network;
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
+using NLightning.Peer.Channel.Establishment.Messages;
 using NLightning.Peer.Channel.Models;
 using NLightning.Wallet.Funding;
 

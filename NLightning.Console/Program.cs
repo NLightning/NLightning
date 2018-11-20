@@ -10,6 +10,7 @@ using NLightning.Node;
 using NLightning.OnChain.Client;
 using NLightning.Peer;
 using NLightning.Peer.Channel;
+using NLightning.Peer.Channel.Establishment;
 using NLightning.Persistence;
 using NLightning.Transport;
 

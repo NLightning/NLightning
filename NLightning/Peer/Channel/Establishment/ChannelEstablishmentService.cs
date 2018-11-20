@@ -11,8 +11,8 @@ using NBitcoin;
 using NLightning.Network;
 using NLightning.OnChain.Client;
 using NLightning.OnChain.Monitoring;
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
 using NLightning.Peer.Channel.Configuration;
+using NLightning.Peer.Channel.Establishment.Messages;
 using NLightning.Peer.Channel.Logging;
 using NLightning.Peer.Channel.Logging.Models;
 using NLightning.Peer.Channel.Models;
@@ -25,7 +25,7 @@ using NLightning.Wallet.Commitment;
 using NLightning.Wallet.Funding;
 using NLightning.Wallet.KeyDerivation;
 
-namespace NLightning.Peer.Channel
+namespace NLightning.Peer.Channel.Establishment
 {
     public class ChannelEstablishmentService : IChannelEstablishmentService, IDisposable
     {
@@ -44,6 +44,9 @@ namespace NLightning.Peer.Channel
         private readonly EventLoopScheduler _taskScheduler = new EventLoopScheduler();
         private readonly Subject<(IPeer, LocalChannel)> _successProvider = new Subject<(IPeer, LocalChannel)>();
         private readonly Subject<(IPeer, PendingChannel, string)> _failedProvider = new Subject<(IPeer, PendingChannel, string)>();
+        private readonly AcceptChannelMessageHandler _acceptChannelMessageHandler;
+        private readonly FundingMessageSignedHandler _fundingMessageSignedHandler;
+        private readonly FundingMessageLockedHandler _fundingMessageLockedHandler;
         private NetworkParameters _networkParameters;
 
         public ChannelEstablishmentService(ILoggerFactory loggerFactory, IConfiguration configuration,
@@ -62,6 +65,9 @@ namespace NLightning.Peer.Channel
             _walletService = walletService;
             _logger = loggerFactory.CreateLogger(GetType());
             _configuration = configuration.GetConfiguration<ChannelConfiguration>();
+            _acceptChannelMessageHandler = new AcceptChannelMessageHandler(_channelLoggingService, _fundingService, _commitmentService);
+            _fundingMessageSignedHandler = new FundingMessageSignedHandler(_channelLoggingService, _fundingService, _commitmentService, _channelService, _blockchainMonitorService);
+            _fundingMessageLockedHandler = new FundingMessageLockedHandler();
         }
 
         public IObservable<(IPeer, PendingChannel, string)> FailureProvider => _failedProvider;
@@ -122,58 +128,17 @@ namespace NLightning.Peer.Channel
 
         private void OnAcceptChannelMessage(IPeer peer, AcceptChannelMessage acceptMessage)
         {
-            var establishment = _channelService.PendingChannels.SingleOrDefault(est => est.Peer == peer &&
+            var pendingChannel = _channelService.PendingChannels.SingleOrDefault(est => est.Peer == peer &&
                                           est.OpenMessage.TemporaryChannelId.SequenceEqual(acceptMessage.TemporaryChannelId));
-            if (establishment == null)
+            if (pendingChannel == null)
             {
                 _logger.LogDebug($"Remote sent us an {nameof(AcceptChannelMessage)}, but there are no matching pending channel open messages.");
                 peer.Messaging.Send(ErrorMessage.UnknownChannel(acceptMessage.TemporaryChannelId));
                 return;
             }
-
-            var oldState = LocalChannelState.AcceptChannel;
-            var openMessage = establishment.OpenMessage;
-            _channelLoggingService.LogPendingChannelInfo(openMessage.TemporaryChannelId.ToHex(), oldState, "Remote accepted channel open");
-            FundingTransaction fundingTx = _fundingService.CreateFundingTransaction(openMessage.FundingSatoshis, openMessage.FeeratePerKw, openMessage.FundingPubKey, acceptMessage.FundingPubKey);
-
-            var channel = CreateChannel(establishment.ChannelIndex, fundingTx, openMessage, acceptMessage);
-            channel.IsFunder = true;
             
-            _commitmentService.CreateInitialCommitmentTransactions(openMessage,acceptMessage, channel, establishment.RevocationKey);
-            channel.State = LocalChannelState.FundingCreated;
-
-            var signatureOfRemoteCommitmentTx = channel.RemoteCommitmentTxParameters.LocalSignature;
-            FundingCreatedMessage fundingCreatedMessage = new FundingCreatedMessage
-            {
-                TemporaryChannelId = openMessage.TemporaryChannelId,
-                FundingTransactionId = fundingTx.Transaction.GetHash().ToBytes(),
-                FundingOutputIndex = fundingTx.FundingOutputIndex,
-                Signature = signatureOfRemoteCommitmentTx.ToRawSignature()
-            };
-
-            establishment.Channel = channel;
-            _channelLoggingService.LogStateUpdate(channel, oldState, additionalData: fundingTx.Transaction.ToString());
-            
+            var fundingCreatedMessage = _acceptChannelMessageHandler.Handle(acceptMessage, pendingChannel);
             peer.Messaging.Send(fundingCreatedMessage);
-        }
-
-        private LocalChannel CreateChannel(uint index, FundingTransaction fundingTx, OpenChannelMessage openMessage, AcceptChannelMessage acceptMessage)
-        {
-            LocalChannel channel = new LocalChannel();
-
-            channel.ChannelIndex = index;
-            channel.TemporaryChannelId = openMessage.TemporaryChannelId.ToHex();
-            channel.LocalChannelParameters = ChannelParameters.CreateFromOpenMessage(openMessage);
-            channel.RemoteChannelParameters = ChannelParameters.CreateFromAcceptMessage(acceptMessage);
-            channel.FundingSatoshis = openMessage.FundingSatoshis;
-            channel.PushMSat = openMessage.PushMSat;
-            channel.MinimumDepth = acceptMessage.MinimumDepth;
-            channel.FundingTransactionId = fundingTx.Transaction.GetHash().ToString();
-            channel.FundingOutputIndex = fundingTx.FundingOutputIndex;
-            channel.ChannelId = LocalChannel.DeriveChannelId(fundingTx.Transaction, fundingTx.FundingOutputIndex);
-            channel.FeeRatePerKw = openMessage.FeeratePerKw;
-            
-            return channel;
         }
 
         public PendingChannel OpenChannel(IPeer peer, ulong fundingSatoshis, ulong pushMSat = 0)
@@ -225,27 +190,14 @@ namespace NLightning.Peer.Channel
                 return;
             }
 
-            var channel = pendingChannel.Channel;
-            var oldState = channel.State;
-            var signature = SignatureConverter.RawToTransactionSignature(message.Signature);
-
-            if (!_commitmentService.IsValidRemoteCommitmentSignature(channel, signature))
+            try
             {
-                _channelLoggingService.LogError(channel, LocalChannelError.InvalidCommitmentSignature, $"Remote {peer.NodeAddress} sent us an invalid commitment signature");
-                string error = "Invalid commitment transaction signature.";
-                channel.State = LocalChannelState.FundingFailed;
-                peer.Messaging.Send(new ErrorMessage(message.ChannelId, error));
-                ChannelEstablishmentFailed(peer, pendingChannel, error);
-                return;
+                _fundingMessageSignedHandler.Handle(peer, message, pendingChannel);
             }
-            
-            channel.LocalCommitmentTxParameters.RemoteSignature = signature;
-            channel.State = LocalChannelState.FundingSigned;
-            _channelService.AddChannel(peer, channel);
-            _fundingService.BroadcastFundingTransaction(channel);
-            WatchForFundingTransaction(channel);
-            _channelService.RemovePendingChannel(pendingChannel);
-            _channelLoggingService.LogStateUpdate(channel, oldState);
+            catch (ChannelException exception)
+            {
+                ChannelEstablishmentFailed(peer, pendingChannel, exception.Message);
+            }
         }
         
         private void OnTransactionConfirmed(Transaction transaction)
@@ -362,10 +314,10 @@ namespace NLightning.Peer.Channel
             }
             
             var oldState = channel.State;
-            channel.State = channel.State == LocalChannelState.FundingLocked ? LocalChannelState.NormalOperation : LocalChannelState.FundingLocked;
-            channel.RemoteCommitmentTxParameters.NextPerCommitmentPoint = message.NextPerCommitmentPoint;
-           
+
+            _fundingMessageLockedHandler.Handle(message, channel);
             _channelService.UpdateChannel(channel);
+            
             if (channel.State == LocalChannelState.NormalOperation)
             {
                 ChannelEstablishmentSuccessful(peer, channel);

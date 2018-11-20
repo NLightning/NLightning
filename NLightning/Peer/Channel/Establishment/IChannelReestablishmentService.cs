@@ -1,7 +1,7 @@
 using System;
 using NLightning.Peer.Channel.Models;
 
-namespace NLightning.Peer.Channel
+namespace NLightning.Peer.Channel.Establishment
 {
     public interface IChannelReestablishmentService
     {

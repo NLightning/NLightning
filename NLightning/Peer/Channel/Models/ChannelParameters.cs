@@ -1,4 +1,4 @@
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
+using NLightning.Peer.Channel.Establishment.Messages;
 
 namespace NLightning.Peer.Channel.Models
 {

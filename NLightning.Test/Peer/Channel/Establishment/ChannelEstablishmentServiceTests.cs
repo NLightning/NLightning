@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -12,12 +11,12 @@ using NLightning.OnChain.Client;
 using NLightning.OnChain.Monitoring;
 using NLightning.Peer;
 using NLightning.Peer.Channel;
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
+using NLightning.Peer.Channel.Establishment;
+using NLightning.Peer.Channel.Establishment.Messages;
 using NLightning.Peer.Channel.Logging;
 using NLightning.Peer.Channel.Models;
 using NLightning.Transport;
 using NLightning.Transport.Messaging;
-using NLightning.Transport.Messaging.Validation;
 using NLightning.Utils.Extensions;
 using NLightning.Wallet;
 using NLightning.Wallet.Commitment;
@@ -25,7 +24,7 @@ using NLightning.Wallet.Funding;
 using NLightning.Wallet.KeyDerivation;
 using Xunit;
 
-namespace NLightning.Test.Peer.Channel
+namespace NLightning.Test.Peer.Channel.Establishment
 {
     public class ChannelEstablishmentServiceTests
     {
@@ -111,10 +110,13 @@ namespace NLightning.Test.Peer.Channel
             var mocks = new Mocks();
 
             mocks.SetupMocks();
-            mocks.ChannelService.Setup(c => c.Channels).Returns(() => new List<LocalChannel>() {}.AsReadOnly());
+            mocks.ChannelService.Setup(c => c.Channels).Returns(() => new List<LocalChannel>().AsReadOnly());
 
             var service = mocks.CreateServiceMock();
             service.Initialize(NetworkParameters.BitcoinTestnet);
+            
+            var message = new AcceptChannelMessage();
+            mocks.IncomingMessageProviderMock.OnNext((mocks.Peer.Object, message));
             
             
         }
@@ -156,10 +158,11 @@ namespace NLightning.Test.Peer.Channel
             public Mock<IBlockchainClientService> BlockchainClientService { get; set; }
             public Mock<ICommitmentTransactionService> CommTxService { get; set; }
             public Mock<IChannelLoggingService> ChannelLoggingService { get; set; }
-
+            public Subject<(IPeer Peer, Message Message)> IncomingMessageProviderMock { get; } = new Subject<(IPeer Peer, Message Message)>();
+            
             public void SetupMocks()
             {
-                PeerService.Setup(p => p.IncomingMessageProvider).Returns(() => new Subject<(IPeer, Message)>());
+                PeerService.Setup(p => p.IncomingMessageProvider).Returns(() => IncomingMessageProviderMock);
                 PeerService.Setup(p => p.ValidationExceptionProvider).Returns(() => new Subject<(IPeer, MessageValidationException)>());
                 BlockchainMonitorService.Setup(p => p.ByTransactionIdProvider).Returns(() => new Subject<Transaction>());
                 ChannelService.Setup(c => c.Channels).Returns(() => new List<LocalChannel>().AsReadOnly());

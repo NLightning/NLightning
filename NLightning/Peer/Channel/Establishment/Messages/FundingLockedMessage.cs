@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using NLightning.Cryptography;
 using NLightning.Transport.Messaging;
-using NLightning.Utils.Extensions;
 
-namespace NLightning.Peer.Channel.ChannelEstablishmentMessages
+namespace NLightning.Peer.Channel.Establishment.Messages
 {
     public class FundingLockedMessage : Message, IChannelMessage
     {

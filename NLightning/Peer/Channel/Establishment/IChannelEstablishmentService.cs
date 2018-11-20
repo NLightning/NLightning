@@ -2,7 +2,7 @@ using System;
 using NLightning.Network;
 using NLightning.Peer.Channel.Models;
 
-namespace NLightning.Peer.Channel
+namespace NLightning.Peer.Channel.Establishment
 {
     public interface IChannelEstablishmentService
     {

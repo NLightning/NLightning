@@ -5,15 +5,14 @@ using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using Microsoft.Extensions.Logging;
-using NLightning.Peer.Channel.ChannelCloseMessages;
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
+using NLightning.Peer.Channel.Establishment.Messages;
 using NLightning.Peer.Channel.Logging;
 using NLightning.Peer.Channel.Models;
 using NLightning.Transport.Messaging;
 using NLightning.Transport.Messaging.SetupMessages;
 using NLightning.Utils.Extensions;
 
-namespace NLightning.Peer.Channel
+namespace NLightning.Peer.Channel.Establishment
 {
     public class ChannelReestablishmentService : IChannelReestablishmentService, IDisposable
     {

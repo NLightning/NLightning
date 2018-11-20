@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using NLightning.Transport.Messaging.Validation;
 
-namespace NLightning.Peer.Channel.ChannelEstablishmentMessages
+namespace NLightning.Peer.Channel.Establishment.Messages
 {
     public class ChannelReestablishMessageValidator : MessageValidator<ChannelReestablishMessage>
     {

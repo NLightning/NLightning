@@ -5,7 +5,7 @@ using NLightning.Transport.Messaging;
 using NLightning.Transport.Messaging.Validation;
 using NLightning.Utils.Extensions;
 
-namespace NLightning.Peer.Channel.ChannelEstablishmentMessages
+namespace NLightning.Peer.Channel.Establishment.Messages
 {
     public class AcceptChannelMessageValidator : MessageValidator<AcceptChannelMessage>
     {

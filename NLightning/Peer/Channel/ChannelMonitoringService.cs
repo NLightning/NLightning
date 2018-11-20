@@ -6,6 +6,7 @@ using System.Reactive.Linq;
 using NBitcoin;
 using NLightning.Network;
 using NLightning.OnChain.Monitoring;
+using NLightning.Peer.Channel.Establishment;
 using NLightning.Peer.Channel.Logging;
 using NLightning.Peer.Channel.Models;
 using NLightning.Peer.Channel.Penalty;

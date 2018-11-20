@@ -1,5 +1,5 @@
 using NLightning.Cryptography;
-using NLightning.Peer.Channel.ChannelEstablishmentMessages;
+using NLightning.Peer.Channel.Establishment.Messages;
 using NLightning.Peer.Channel.Models;
 using NLightning.Utils.Extensions;
 
