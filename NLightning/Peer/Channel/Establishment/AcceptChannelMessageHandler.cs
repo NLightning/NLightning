@@ -21,7 +21,7 @@ namespace NLightning.Peer.Channel.Establishment
             _commitmentService = commitmentService;
         }
 
-        public Message Handle(AcceptChannelMessage acceptMessage, PendingChannel pendingChannel)
+        public FundingCreatedMessage Handle(AcceptChannelMessage acceptMessage, PendingChannel pendingChannel)
         {
             var oldState = LocalChannelState.AcceptChannel;
             var openMessage = pendingChannel.OpenMessage;
