@@ -35,7 +35,7 @@ namespace NLightning.Test.Utils
 
             var encoded = encoder.Encode(ids, true);
             
-            Assert.Equal("0113de338781a1818141184c0b0a4268252500", encoded.ToHex());
+            Assert.Equal("01789c13de338781a1818141184c0b0a4268252500", encoded.ToHex());
         }
         
                 
@@ -69,7 +69,7 @@ namespace NLightning.Test.Utils
                 "13bc9c0000802222".HexToByteArray()
             };
 
-            var decoded = encoder.Decode("0113de338781a1818141184c0b0a4268252500".HexToByteArray());
+            var decoded = encoder.Decode("01780113de338781a1818141184c0b0a4268252500".HexToByteArray());
             
             Assert.Equal(reference.Count, decoded.Count);
 
