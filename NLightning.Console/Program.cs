@@ -18,7 +18,7 @@ namespace NLightning.Console
 {
     class Program
     {
-        static void MyMain(string[] args)
+        static void Main(string[] args)
         {
             string localPrivateKey = "<node private key>";
             ECKeyPair localLightningKey = new ECKeyPair(localPrivateKey, true);
