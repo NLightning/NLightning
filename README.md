@@ -1,7 +1,8 @@
 # NLightning
 
-<p>NLightning is a library to connect, synchronize, send and receive payments with the lightning network.</p>
-<p>Current implementation uses bitcoind (with -txindex) as backend.</p>
+NLightning is a library to connect, synchronize, send and receive payments with the lightning network.
+
+Current implementation uses bitcoind (with -txindex) as backend.
 
 __⚠ NLightning is in an early development stage, do not use with real funds!__
 
