@@ -13,7 +13,7 @@ namespace NLightning.Utils
             using (MemoryStream inputStream = new MemoryStream(data))
             using (MemoryStream outputStream = new MemoryStream())
             {
-                outputStream.Write(ZlibDefaultCompressionHeader);
+                outputStream.Write(ZlibDefaultCompressionHeader, 0, ZlibDefaultCompressionHeader.Length);
                 
                 using (DeflateStream deflateStream = new DeflateStream(outputStream, CompressionMode.Compress))
                 {

@@ -23,7 +23,7 @@ namespace NLightning.Transport.Messaging
         {
             lock (_sendLock)
             {
-                _networkStream.Write(data);
+                _networkStream.Write(data, 0, data.Length);
             }
         }
 

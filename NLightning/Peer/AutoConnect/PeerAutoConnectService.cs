@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Net.Sockets;
 using System.Reactive.Concurrency;
-using System.Reflection.Metadata.Ecma335;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using NLightning.Network;

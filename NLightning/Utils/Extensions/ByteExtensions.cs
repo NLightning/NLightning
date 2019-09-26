@@ -7,17 +7,20 @@ namespace NLightning.Utils.Extensions
     {        
         public static ushort ToUShortBigEndian(this byte[] data, int index = 0)
         {
-            return BitConverter.ToUInt16(data.SubArray(index, 2).Reverse().ToArray());
+            var subArray = data.SubArray(index, 2).Reverse().ToArray();
+            return BitConverter.ToUInt16(subArray, 0);
         }
        
         public static uint ToUIntBigEndian(this byte[] data, int index = 0)
         {
-            return BitConverter.ToUInt32(data.SubArray(index, 4).Reverse().ToArray());
+            var subArray = data.SubArray(index, 4).Reverse().ToArray();
+            return BitConverter.ToUInt32(subArray, 0);
         }
         
         public static ulong ToULongBigEndian(this byte[] data, int index = 0)
         {
-            return BitConverter.ToUInt64(data.SubArray(index, 8).Reverse().ToArray());
+            var subArray = data.SubArray(index, 8).Reverse().ToArray();
+            return BitConverter.ToUInt64(subArray, 0);
         }
         
         public static byte[] Combine(params byte[][] arrays)

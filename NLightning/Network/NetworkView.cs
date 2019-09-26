@@ -67,7 +67,9 @@ namespace NLightning.Network
         {
             lock (_syncObject)
             {
-                return _channels.GetValueOrDefault(shortChannelId);
+                var channel = default(NetworkChannel);
+                _channels.TryGetValue(shortChannelId, out channel);
+                return channel;
             }
         }
         
@@ -128,7 +130,8 @@ namespace NLightning.Network
         {
             lock (_syncObject)
             {
-                _viewStates.TryAdd(state.PeerNetworkAddress, state);
+                if (!_viewStates.TryGetValue(state.PeerNetworkAddress, out _))
+                    _viewStates.Add(state.PeerNetworkAddress, state);
             }
         }
     }
