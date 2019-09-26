@@ -30,7 +30,8 @@ namespace NLightning.Network.GossipMessages
             var viewConfiguration = configuration.GetConfiguration<NetworkViewConfiguration>();
             _networkViewService = networkViewService;
             _logger = loggerFactory.CreateLogger(GetType());
-            _periodicScheduler = _eventScheduler.SchedulePeriodic(viewConfiguration.UpdateInterval * 2, ClearCache);
+            var newSpan = TimeSpan.FromMilliseconds(viewConfiguration.UpdateInterval.TotalMilliseconds * 2);
+            _periodicScheduler = _eventScheduler.SchedulePeriodic(newSpan, ClearCache);
         }
         
         public void Validate(Message message, byte[] rawData)
@@ -66,7 +67,8 @@ namespace NLightning.Network.GossipMessages
             
             if (channel == null)
             {
-                var cacheEntry = _channelIdNodeIdsMapping.GetValueOrDefault(message.ShortChannelIdHex);
+                var cacheEntry = default((ECKeyPair, ECKeyPair));
+                _channelIdNodeIdsMapping.TryGetValue(message.ShortChannelIdHex, out cacheEntry);
                 if (cacheEntry.Item1 == null || cacheEntry.Item2 == null)
                 {
                     throw new MessageValidationException(message, $"ChannelUpdateMessage: Can't validate channel update message without channel announcement. Channel ID: {message.ShortChannelIdHex}");

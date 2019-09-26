@@ -223,7 +223,8 @@ namespace NLightning.Network
             var pendingUpdateMessages = channelUpdateMessages.Select(m => m.Message).ToList();
             foreach (var message in channelMessages.GroupBy(cm => cm.Message.ShortChannelIdHex).Select(y => y.Last()))
             {
-                var channel = channels.GetValueOrDefault(message.Message.ShortChannelIdHex);
+                var channel = default(NetworkChannel);
+                channels.TryGetValue(message.Message.ShortChannelIdHex, out channel);
                 var channelUpdateMessage = pendingUpdateMessages.LastOrDefault(m => m.ShortChannelIdHex == message.Message.ShortChannelIdHex);
 
                 if (channel != null && channelUpdateMessage != null)
@@ -249,7 +250,8 @@ namespace NLightning.Network
 
             foreach (var updateMessage in pendingUpdateMessages)
             {
-                var channel = channels.GetValueOrDefault(updateMessage.ShortChannelIdHex);
+                var channel = default(NetworkChannel);
+                channels.TryGetValue(updateMessage.ShortChannelIdHex, out channel);
                 channel?.Update(updateMessage);
             }
 
@@ -280,7 +282,8 @@ namespace NLightning.Network
             var newNodes = new Dictionary<string, NetworkNode>();
             foreach (var message in nodeAnnouncementMessages.GroupBy(cm => cm.Message.NodeIdHex).Select(y => y.Last()))
             {
-                var existingNode = nodes.GetValueOrDefault(message.Message.NodeIdHex);
+                var existingNode = default(NetworkNode);
+                nodes.TryGetValue(message.Message.NodeIdHex, out existingNode);
                 if (existingNode != null)
                 {
                     existingNode.Update(message.Message);
@@ -434,7 +437,8 @@ namespace NLightning.Network
         
         private PeerNetworkViewState GetOrCreatePeerState(string networkAddress)
         {
-            var state = _view.GetPeerStates().GetValueOrDefault(networkAddress);
+            var state = default(PeerNetworkViewState);
+            _view.GetPeerStates().TryGetValue(networkAddress, out state);
             if (state == null)
             {
                 state = new PeerNetworkViewState { PeerNetworkAddress = networkAddress } ;

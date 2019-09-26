@@ -222,13 +222,15 @@ namespace NLightning.Transport
             if (_state.HandshakeState == HandshakeState.Initialized)
             {
                 (_, ECKeyPair ephemeralKey) = ReadActOneRequest(inputBuffer, inputBufferLength);
-                stream.Write(ApplyActTwo(ephemeralKey));
+                var toWrite = ApplyActTwo(ephemeralKey);
+                stream.Write(toWrite, 0, toWrite.Length);
             } 
             
             if (_state.HandshakeState == HandshakeState.Act1)
             {
                 (byte[] tempK2, ECKeyPair ephemeralKey) = ReadActTwoAnswer(inputBuffer, inputBufferLength);
-                stream.Write(ApplyActThree(tempK2, ephemeralKey));
+                var toWrite = ApplyActThree(tempK2, ephemeralKey);
+                stream.Write(toWrite, 0, toWrite.Length);
             } 
 
             if (_state.HandshakeState == HandshakeState.Act2)

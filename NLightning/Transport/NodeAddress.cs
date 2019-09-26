@@ -44,7 +44,7 @@ namespace NLightning.Transport
 
         public static NodeAddress Parse(String address)
         {
-            var pubKeyAddressSplit = address.Split("@");
+            var pubKeyAddressSplit = address.Split('@');
             if (pubKeyAddressSplit.Length != 2)
             {
                 throw new ArgumentException("Invalid address format.", "address");
@@ -52,7 +52,7 @@ namespace NLightning.Transport
             
             String publicKey = pubKeyAddressSplit.First();
             String ipAndPort = pubKeyAddressSplit.Last();
-            var ipPortSplit = ipAndPort.Split(":");
+            var ipPortSplit = ipAndPort.Split(':');
             
             String ipAddress = ipPortSplit.First();
             int port = ipAndPort.Length == 2 ? Int32.Parse(ipPortSplit.Last()) : 9735;

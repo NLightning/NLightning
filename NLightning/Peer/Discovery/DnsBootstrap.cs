@@ -89,7 +89,7 @@ namespace NLightning.Peer.Discovery
 
         private ECKeyPair GetPublicKey(SrvRecord srv)
         {
-            string bech32 = srv.Target.Value.Split(".").First();
+            string bech32 = srv.Target.Value.Split('.').First();
 
             Bech32Encoder bech32Encoder = Encoders.Bech32("ln");
             var bech32Data5Bits = bech32Encoder.DecodeData(bech32);
