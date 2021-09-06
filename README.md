@@ -1,3 +1,7 @@
+# This project is not maintained.
+Lightning Network implementations that are actively being worked on can be found here:
+https://github.com/bcongdon/awesome-lightning-network#implementations
+
 # NLightning
 
 NLightning is a library to connect, synchronize, send and receive payments with the lightning network.
